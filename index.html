@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f4efe6">
+<title>墨韵 · Ink Bloom</title>
+<style>
+  :root {
+    --paper: #f4efe6;
+    --ink: #1a1a22;
+    --muted: #8a8070;
+    --glass: rgba(244, 239, 230, 0.72);
+    --glass-border: rgba(90, 70, 40, 0.12);
+    --shadow: 0 8px 32px rgba(60, 40, 20, 0.08), 0 2px 8px rgba(60, 40, 20, 0.04);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-l: env(safe-area-inset-left, 0px);
+    --safe-r: env(safe-area-inset-right, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Songti SC", "Noto Serif SC", "STSong", Georgia, "Times New Roman", serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  #grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0.32;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.55 0 0 0 0 0.48 0 0 0 0 0.35 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    animation: grainShift 18s ease-in-out infinite alternate;
+  }
+
+  @keyframes grainShift {
+    0% { opacity: 0.26; transform: translate(0, 0); }
+    50% { opacity: 0.36; }
+    100% { opacity: 0.28; transform: translate(-1px, 1px); }
+  }
+
+  header {
+    position: fixed;
+    top: calc(20px + var(--safe-t));
+    left: calc(24px + var(--safe-l));
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  header h1 {
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: 0.35em;
+    color: var(--ink);
+    opacity: 0.78;
+    line-height: 1.2;
+  }
+
+  header p {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 0.68rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 4px;
+    opacity: 0.7;
+  }
+
+  #hint {
+    position: fixed;
+    left: 50%;
+    top: 48%;
+    transform: translate(-50%, -50%);
+    z-index: 8;
+    pointer-events: none;
+    text-align: center;
+    transition: opacity 1.2s ease;
+  }
+
+  #hint span {
+    display: inline-block;
+    font-size: 0.95rem;
+    letter-spacing: 0.28em;
+    color: var(--muted);
+    opacity: 0.55;
+    animation: softPulse 2.8s ease-in-out infinite;
+  }
+
+  #hint.gone { opacity: 0; }
+
+  @keyframes softPulse {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.65; transform: scale(1.02); }
+  }
+
+  .dock {
+    position: fixed;
+    bottom: calc(20px + var(--safe-b));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: calc(100% - 24px - var(--safe-l) - var(--safe-r));
+    pointer-events: none;
+  }
+
+  .dock > * { pointer-events: auto; }
+
+  .panel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--glass);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+
+  .chips {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .chip {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), inset 0 0 0 1px rgba(0,0,0,0.06);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .chip:hover { transform: scale(1.08); }
+  .chip:focus-visible { outline: 2px solid rgba(60,40,20,0.35); outline-offset: 2px; }
+
+  .chip.active {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px rgba(40, 30, 20, 0.45), 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  .chip[data-color="nongmo"] { background: radial-gradient(circle at 35% 30%, #3a3a48, #12121a); }
+  .chip[data-color="zhusha"] { background: radial-gradient(circle at 35% 30%, #c45a4a, #8b2e28); }
+  .chip[data-color="dianqing"] { background: radial-gradient(circle at 35% 30%, #4a6a8a, #1e3a5a); }
+  .chip[data-color="songyan"] { background: radial-gradient(circle at 35% 30%, #8a8680, #4a4844); }
+
+  .divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(90, 70, 40, 0.15);
+    flex-shrink: 0;
+  }
+
+  .btn {
+    font-family: "Songti SC", "Noto Serif SC", Georgia, serif;
+    font-size: 0.82rem;
+    letter-spacing: 0.12em;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.2s, background 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { opacity: 1; background: rgba(60, 40, 20, 0.06); }
+  .btn:active { opacity: 0.9; background: rgba(60, 40, 20, 0.1); }
+  .btn:focus-visible { outline: 2px solid rgba(60,40,20,0.35); outline-offset: 2px; }
+
+  .strength {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--glass);
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+
+  .strength label {
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .strength input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100px;
+    max-width: 28vw;
+    height: 3px;
+    background: rgba(90, 70, 40, 0.2);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .strength input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #2a2a32;
+    border: 2px solid var(--paper);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    cursor: pointer;
+  }
+
+  .strength input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #2a2a32;
+    border: 2px solid var(--paper);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    cursor: pointer;
+  }
+
+  @media (max-width: 380px) {
+    header h1 { font-size: 1.15rem; letter-spacing: 0.28em; }
+    .chip { width: 24px; height: 24px; }
+    .btn { font-size: 0.75rem; padding: 5px 8px; }
+    .strength input[type="range"] { width: 72px; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="stage" aria-label="水墨画布，点按或拖动落墨"></canvas>
+  <div id="grain" aria-hidden="true"></div>
+
+  <header>
+    <h1>墨韵</h1>
+    <p>Ink Bloom</p>
+  </header>
+
+  <div id="hint"><span>点按或拖动落墨</span></div>
+
+  <div class="dock">
+    <div class="strength">
+      <label for="opacity">浓淡</label>
+      <input type="range" id="opacity" min="0.25" max="1" step="0.05" value="0.72" aria-label="墨色浓淡">
+    </div>
+    <div class="panel" role="toolbar" aria-label="墨色与操作">
+      <div class="chips" role="radiogroup" aria-label="墨色">
+        <button type="button" class="chip active" data-color="nongmo" title="浓墨" aria-label="浓墨" role="radio" aria-checked="true"></button>
+        <button type="button" class="chip" data-color="zhusha" title="朱砂" aria-label="朱砂" role="radio" aria-checked="false"></button>
+        <button type="button" class="chip" data-color="dianqing" title="靛青" aria-label="靛青" role="radio" aria-checked="false"></button>
+        <button type="button" class="chip" data-color="songyan" title="松烟" aria-label="松烟" role="radio" aria-checked="false"></button>
+      </div>
+      <div class="divider" aria-hidden="true"></div>
+      <button type="button" class="btn" id="clearBtn" aria-label="清空画布">清空</button>
+      <button type="button" class="btn" id="exportBtn" aria-label="导出为 PNG 图片">导出</button>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var COLORS = {
+    nongmo:   { r: 18,  g: 18,  b: 26 },
+    zhusha:   { r: 155, g: 48,  b: 42 },
+    dianqing: { r: 30,  g: 58,  b: 95 },
+    songyan:  { r: 72,  g: 70,  b: 66 }
+  };
+
+  var PAPER = { r: 244, g: 239, b: 230 };
+
+  var canvas = document.getElementById("stage");
+  var ctx = canvas.getContext("2d", { alpha: false });
+  var ink = document.createElement("canvas");
+  var ictx = ink.getContext("2d");
+  var hint = document.getElementById("hint");
+  var opacitySlider = document.getElementById("opacity");
+
+  var dpr = 1;
+  var W = 0, H = 0;
+  var currentColor = "nongmo";
+  var strength = 0.72;
+  var drawing = false;
+  var lastX = 0, lastY = 0;
+  var lastSpawn = 0;
+  var interacted = false;
+  var clearing = false;
+  var clearT = 0;
+  var blooms = [];
+  var lastFrame = 0;
+
+  function resize() {
+    // Snapshot existing ink before resize
+    var prev = null;
+    var pw = ink.width, ph = ink.height;
+    if (pw > 0 && ph > 0) {
+      prev = document.createElement("canvas");
+      prev.width = pw;
+      prev.height = ph;
+      prev.getContext("2d").drawImage(ink, 0, 0);
+    }
+
+    dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    ink.width = canvas.width;
+    ink.height = canvas.height;
+    ictx.setTransform(1, 0, 0, 1, 0, 0);
+    ictx.clearRect(0, 0, ink.width, ink.height);
+
+    if (prev) {
+      ictx.drawImage(prev, 0, 0, pw, ph, 0, 0, ink.width, ink.height);
+    }
+  }
+
+  function rand(a, b) {
+    return a + Math.random() * (b - a);
+  }
+
+  function makeParts(maxR) {
+    var parts = [];
+    var n = 5 + (Math.random() * 4 | 0);
+    for (var i = 0; i < n; i++) {
+      var ang = (Math.PI * 2 * i) / n + rand(-0.45, 0.45);
+      var dist = rand(0, maxR * 0.38);
+      parts.push({
+        ox: Math.cos(ang) * dist,
+        oy: Math.sin(ang) * dist,
+        scale: rand(0.4, 1.1),
+        stretch: rand(0.7, 1.3)
+      });
+    }
+    return parts;
+  }
+
+  function spawnBloom(x, y, pressure) {
+    var col = COLORS[currentColor];
+    var base = 16 + strength * 44 + (pressure || 0.5) * 18;
+    var maxR = base * rand(0.82, 1.28);
+    blooms.push({
+      x: x,
+      y: y,
+      r: maxR * 0.06,
+      maxR: maxR,
+      life: 1,
+      decay: rand(0.0045, 0.0075),
+      alpha: (0.4 + strength * 0.55) * rand(0.88, 1.05),
+      color: col,
+      jitter: rand(0, Math.PI * 2),
+      parts: makeParts(maxR),
+      stained: false,
+      stainAt: 0.55 + rand(0, 0.2)
+    });
+  }
+
+  function spawnAlong(x0, y0, x1, y1) {
+    var dx = x1 - x0;
+    var dy = y1 - y0;
+    var dist = Math.hypot(dx, dy);
+    var step = 12 + (1 - strength) * 12;
+    if (dist < 2) {
+      spawnBloom(x1, y1, 0.55);
+      return;
+    }
+    var n = Math.max(1, Math.floor(dist / step));
+    for (var i = 1; i <= n; i++) {
+      var t = i / n;
+      spawnBloom(x0 + dx * t + rand(-2.2, 2.2), y0 + dy * t + rand(-2.2, 2.2), Math.min(1, dist / 36));
+    }
+  }
+
+  /** Draw a bloom onto a context (screen CSS pixels if target is main ctx; ink uses dpr scale) */
+  function paintBloom(target, b, scale, stainMode) {
+    var c = b.color;
+    var lifeFade = stainMode ? 1 : (b.life * b.life);
+    var a = b.alpha * lifeFade * (stainMode ? 0.55 : 1);
+    if (a < 0.006) return;
+
+    var x = b.x * scale;
+    var y = b.y * scale;
+    var r = b.r * scale;
+
+    target.save();
+    target.globalCompositeOperation = "source-over";
+
+    for (var i = 0; i < b.parts.length; i++) {
+      var p = b.parts[i];
+      var px = x + p.ox * scale * (b.r / b.maxR) * 1.15 + Math.sin(b.jitter + i) * 0.8 * scale;
+      var py = y + p.oy * scale * (b.r / b.maxR) * 1.15 + Math.cos(b.jitter + i * 1.3) * 0.8 * scale;
+      var pr = r * p.scale;
+
+      var grad = target.createRadialGradient(px, py, 0, px, py, pr);
+      grad.addColorStop(0, "rgba(" + c.r + "," + c.g + "," + c.b + "," + (a * 0.5) + ")");
+      grad.addColorStop(0.32, "rgba(" + c.r + "," + c.g + "," + c.b + "," + (a * 0.26) + ")");
+      grad.addColorStop(0.68, "rgba(" + c.r + "," + c.g + "," + c.b + "," + (a * 0.09) + ")");
+      grad.addColorStop(1, "rgba(" + c.r + "," + c.g + "," + c.b + ",0)");
+
+      target.beginPath();
+      target.ellipse(px, py, pr, pr * p.stretch, b.jitter * 0.12 + i * 0.35, 0, Math.PI * 2);
+      target.fillStyle = grad;
+      target.fill();
+    }
+
+    var coreR = r * 0.5;
+    var core = target.createRadialGradient(x, y, 0, x, y, coreR);
+    core.addColorStop(0, "rgba(" + c.r + "," + c.g + "," + c.b + "," + (a * 0.38) + ")");
+    core.addColorStop(1, "rgba(" + c.r + "," + c.g + "," + c.b + ",0)");
+    target.beginPath();
+    target.arc(x, y, coreR, 0, Math.PI * 2);
+    target.fillStyle = core;
+    target.fill();
+
+    target.restore();
+  }
+
+  function stampStain(b) {
+    // Soft permanent mark on ink layer (device pixels)
+    paintBloom(ictx, b, dpr, true);
+    // Extra feather ring for paper soak feel
+    var c = b.color;
+    var x = b.x * dpr;
+    var y = b.y * dpr;
+    var r = b.maxR * dpr * 0.9;
+    var g = ictx.createRadialGradient(x, y, r * 0.2, x, y, r);
+    var a = b.alpha * 0.12;
+    g.addColorStop(0, "rgba(" + c.r + "," + c.g + "," + c.b + "," + a + ")");
+    g.addColorStop(1, "rgba(" + c.r + "," + c.g + "," + c.b + ",0)");
+    ictx.fillStyle = g;
+    ictx.beginPath();
+    ictx.arc(x, y, r, 0, Math.PI * 2);
+    ictx.fill();
+  }
+
+  function updateBlooms(dt) {
+    var speed = Math.min(dt / 16.67, 2.4);
+    for (var i = blooms.length - 1; i >= 0; i--) {
+      var b = blooms[i];
+      if (b.r < b.maxR) {
+        b.r += (b.maxR - b.r) * 0.048 * speed + 0.4 * speed;
+        if (b.r > b.maxR) b.r = b.maxR;
+      }
+      // Stamp once when bloom has expanded enough
+      if (!b.stained && (b.r / b.maxR) >= b.stainAt) {
+        stampStain(b);
+        b.stained = true;
+      }
+      b.life -= b.decay * speed;
+      b.jitter += 0.01 * speed;
+      if (b.life <= 0) {
+        if (!b.stained) stampStain(b);
+        blooms.splice(i, 1);
+      }
+    }
+  }
+
+  function paintPaperBg() {
+    ctx.fillStyle = "rgb(" + PAPER.r + "," + PAPER.g + "," + PAPER.b + ")";
+    ctx.fillRect(0, 0, W, H);
+    var g = ctx.createRadialGradient(
+      W * 0.5, H * 0.42, Math.min(W, H) * 0.15,
+      W * 0.5, H * 0.5, Math.max(W, H) * 0.72
+    );
+    g.addColorStop(0, "rgba(244,239,230,0)");
+    g.addColorStop(1, "rgba(218,205,180,0.25)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function frame(now) {
+    var dt = Math.min(now - (lastFrame || now), 40);
+    lastFrame = now;
+
+    paintPaperBg();
+
+    // Permanent ink layer (multiply onto paper)
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    ctx.drawImage(ink, 0, 0, W, H);
+    ctx.restore();
+
+    updateBlooms(dt);
+
+    if (blooms.length > 220) {
+      // Force-stamp oldest before drop
+      while (blooms.length > 220) {
+        var old = blooms.shift();
+        if (old && !old.stained) stampStain(old);
+      }
+    }
+
+    // Live wet blooms on top
+    ctx.save();
+    ctx.globalCompositeOperation = "multiply";
+    for (var i = 0; i < blooms.length; i++) {
+      paintBloom(ctx, blooms[i], 1, false);
+    }
+    ctx.restore();
+
+    // Gentle clear fade
+    if (clearing) {
+      clearT += 0.035;
+      var a = Math.min(1, clearT);
+      ctx.fillStyle = "rgba(" + PAPER.r + "," + PAPER.g + "," + PAPER.b + "," + a + ")";
+      ctx.fillRect(0, 0, W, H);
+      if (clearT >= 1) {
+        ictx.clearRect(0, 0, ink.width, ink.height);
+        blooms.length = 0;
+        clearing = false;
+        clearT = 0;
+      }
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  function getPos(e) {
+    if (e.touches && e.touches.length) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function hideHint() {
+    if (interacted) return;
+    interacted = true;
+    hint.classList.add("gone");
+    setTimeout(function () { hint.style.display = "none"; }, 1300);
+  }
+
+  function onDown(e) {
+    e.preventDefault();
+    hideHint();
+    drawing = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    var p = getPos(e);
+    lastX = p.x;
+    lastY = p.y;
+    lastSpawn = performance.now();
+    spawnBloom(p.x, p.y, 0.95);
+  }
+
+  function onMove(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    var p = getPos(e);
+    var now = performance.now();
+    if (now - lastSpawn >= 20) {
+      spawnAlong(lastX, lastY, p.x, p.y);
+      lastSpawn = now;
+      lastX = p.x;
+      lastY = p.y;
+    }
+  }
+
+  function onUp(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    drawing = false;
+  }
+
+  canvas.addEventListener("pointerdown", onDown, { passive: false });
+  window.addEventListener("pointermove", onMove, { passive: false });
+  window.addEventListener("pointerup", onUp, { passive: false });
+  window.addEventListener("pointercancel", onUp, { passive: false });
+
+  document.addEventListener("touchmove", function (e) {
+    e.preventDefault();
+  }, { passive: false });
+
+  document.querySelectorAll(".chip").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      document.querySelectorAll(".chip").forEach(function (c) {
+        c.classList.remove("active");
+        c.setAttribute("aria-checked", "false");
+      });
+      chip.classList.add("active");
+      chip.setAttribute("aria-checked", "true");
+      currentColor = chip.getAttribute("data-color");
+    });
+  });
+
+  opacitySlider.addEventListener("input", function () {
+    strength = parseFloat(opacitySlider.value);
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", function () {
+    if (clearing) return;
+    if (blooms.length === 0 && ink.width > 0) {
+      // Check if ink layer is empty — still allow clear for simplicity
+    }
+    clearing = true;
+    clearT = 0;
+  });
+
+  document.getElementById("exportBtn").addEventListener("click", function () {
+    var out = document.createElement("canvas");
+    out.width = canvas.width;
+    out.height = canvas.height;
+    var ox = out.getContext("2d");
+
+    // Paper
+    ox.fillStyle = "rgb(" + PAPER.r + "," + PAPER.g + "," + PAPER.b + ")";
+    ox.fillRect(0, 0, out.width, out.height);
+    var vg = ox.createRadialGradient(
+      out.width * 0.5, out.height * 0.42, Math.min(out.width, out.height) * 0.15,
+      out.width * 0.5, out.height * 0.5, Math.max(out.width, out.height) * 0.72
+    );
+    vg.addColorStop(0, "rgba(244,239,230,0)");
+    vg.addColorStop(1, "rgba(218,205,180,0.25)");
+    ox.fillStyle = vg;
+    ox.fillRect(0, 0, out.width, out.height);
+
+    // Ink layer
+    ox.globalCompositeOperation = "multiply";
+    ox.drawImage(ink, 0, 0);
+    // Live blooms
+    ox.setTransform(1, 0, 0, 1, 0, 0);
+    for (var i = 0; i < blooms.length; i++) {
+      paintBloom(ox, blooms[i], dpr, false);
+    }
+    ox.globalCompositeOperation = "source-over";
+
+    // Subtle grain dots
+    ox.globalCompositeOperation = "multiply";
+    ox.globalAlpha = 0.1;
+    for (var n = 0; n < 1200; n++) {
+      ox.fillStyle = "rgba(110,95,70," + (Math.random() * 0.45) + ")";
+      ox.fillRect(Math.random() * out.width, Math.random() * out.height, 1.2, 1.2);
+    }
+    ox.globalAlpha = 1;
+    ox.globalCompositeOperation = "source-over";
+
+    var link = document.createElement("a");
+    var d = new Date();
+    function pad(n) { return String(n).padStart(2, "0"); }
+    link.download = "ink-bloom-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes()) + ".png";
+    link.href = out.toDataURL("image/png");
+    link.click();
+  });
+
+  window.addEventListener("resize", resize);
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
